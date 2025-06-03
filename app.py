@@ -15,7 +15,7 @@ if file is None:
     st.warning('이미지를 업로드해주세요.')
 else:
     image = Image.open(file).convert("RGB")
-    st.image(image, caption="업로드한 이미지", use_column_width=True)
+    st.image(image, caption="업로드한 이미지", use_container_width=True)
 
     # CLIP에 넣기 위한 전처리
     inputs = processor(
