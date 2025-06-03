@@ -1,11 +1,14 @@
-
 import streamlit as st
-from PIL import Image, ImageOps
+from PIL import Image
 import torch
 from transformers import CLIPProcessor, CLIPModel
 
-# 모델 및 프로세서 로드
+# CPU 장치 지정
+device = torch.device("cpu")
+
+# 모델 및 프로세서 로드 (CPU에 명시적으로 올림)
 model = CLIPModel.from_pretrained("openai/clip-vit-base-patch16")
+model.to(device)
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch16")
 
 st.title('AI 생성 이미지 판별기')
@@ -15,7 +18,7 @@ if file is None:
     st.warning('이미지를 업로드해주세요.')
 else:
     image = Image.open(file).convert("RGB")
-    st.image(image, caption="업로드한 이미지", use_column_width=True)
+    st.image(image, caption="업로드한 이미지", use_container_width=True)
 
     # CLIP에 넣기 위한 전처리
     inputs = processor(
@@ -24,6 +27,9 @@ else:
         return_tensors="pt",
         padding=True,
     )
+
+    # 입력도 CPU에 올리기
+    inputs = {k: v.to(device) for k, v in inputs.items()}
 
     # 추론
     with torch.no_grad():
