@@ -1,45 +1,45 @@
-import streamlit as st
-from PIL import Image
 import torch
 from transformers import CLIPProcessor, CLIPModel
+from PIL import Image
 
-# CPU device 설정
-device = torch.device("cpu")
+def debug_device_info(tensors_dict):
+    print("---- 디바이스 정보 ----")
+    for k, v in tensors_dict.items():
+        print(f"{k}: device={v.device}, shape={v.shape}, dtype={v.dtype}")
+    print("---------------------")
 
-# 모델 및 프로세서 로드 (device_map=None으로 CPU에 바로 로드)
-model = CLIPModel.from_pretrained("openai/clip-vit-base-patch16", device_map=None)
-processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch16")
+def main():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
 
-st.title('AI 생성 이미지 판별기')
-file = st.file_uploader('이미지를 업로드 해주세요.', type=['jpg', 'jpeg', 'png'])
+    # 모델 불러오기
+    model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+    model.to(device)
+    model.eval()
 
-if file is None:
-    st.warning('이미지를 업로드해주세요.')
-else:
-    image = Image.open(file).convert("RGB")
-    st.image(image, caption="업로드한 이미지", use_container_width=True)
+    # 모델 파라미터 디바이스 출력
+    print("모델 파라미터 디바이스 예시:")
+    for name, param in model.named_parameters():
+        print(f"{name}: {param.device}")
+        break  # 한개만 확인
 
-    # CLIP 입력 전처리
-    inputs = processor(
-        text=["a real photo", "an AI-generated image"],
-        images=image,
-        return_tensors="pt",
-        padding=True,
-    )
-    # inputs는 CPU 텐서이므로 to(device) 하지 않음
+    # 이미지와 텍스트 준비 (디버깅용 더미 이미지 사용)
+    processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    image = Image.new("RGB", (224, 224), color="red")
+    inputs = processor(text=["a photo of a cat"], images=image, return_tensors="pt")
 
-    # 추론
+    # 입력 텐서 디바이스 확인
+    debug_device_info(inputs)
+
+    # 입력 텐서를 모델 디바이스로 이동
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+    debug_device_info(inputs)
+
+    # 모델에 입력
     with torch.no_grad():
         outputs = model(**inputs)
-        logits = outputs.logits_per_image
-        probs = logits.softmax(dim=1)[0]
 
-    # 결과 출력
-    st.subheader("분석 결과")
-    st.write(f"🟢 실사 이미지일 확률: **{probs[0]*100:.2f}%**")
-    st.write(f"🔴 AI 생성 이미지일 확률: **{probs[1]*100:.2f}%**")
+    print("모델 출력:", outputs)
 
-    if probs[1] > probs[0]:
-        st.error("⚠️ 이 이미지는 AI가 생성했을 가능성이 높습니다.")
-    else:
-        st.success("✅ 이 이미지는 실사일 가능성이 높습니다.")
+if __name__ == "__main__":
+    main()
