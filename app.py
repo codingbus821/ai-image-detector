@@ -3,12 +3,11 @@ from PIL import Image
 import torch
 from transformers import CLIPProcessor, CLIPModel
 
-# CPU 장치 지정
+# CPU device 설정
 device = torch.device("cpu")
 
-# 모델 및 프로세서 로드 (CPU에 명시적으로 올림)
-model = CLIPModel.from_pretrained("openai/clip-vit-base-patch16")
-model.to(device)
+# 모델 및 프로세서 로드 (device_map=None으로 CPU에 바로 로드)
+model = CLIPModel.from_pretrained("openai/clip-vit-base-patch16", device_map=None)
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch16")
 
 st.title('AI 생성 이미지 판별기')
@@ -20,16 +19,14 @@ else:
     image = Image.open(file).convert("RGB")
     st.image(image, caption="업로드한 이미지", use_container_width=True)
 
-    # CLIP에 넣기 위한 전처리
+    # CLIP 입력 전처리
     inputs = processor(
         text=["a real photo", "an AI-generated image"],
         images=image,
         return_tensors="pt",
         padding=True,
     )
-
-    # 입력도 CPU에 올리기
-    inputs = {k: v.to(device) for k, v in inputs.items()}
+    # inputs는 CPU 텐서이므로 to(device) 하지 않음
 
     # 추론
     with torch.no_grad():
