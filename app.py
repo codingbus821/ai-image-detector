@@ -8,8 +8,8 @@ from transformers import CLIPProcessor, CLIPModel
 def load_model():
     try:
         processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-        model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32", device_map=None)
-        model.to("cpu")
+        # 핵심: low_cpu_mem_usage=False를 명시하여 meta tensor 상태로 로드되지 않게 함
+        model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32", low_cpu_mem_usage=False)
         model.eval()
         return processor, model
     except Exception as e:
