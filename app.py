@@ -1,45 +1,69 @@
+import streamlit as st
+from PIL import Image
 import torch
 from transformers import CLIPProcessor, CLIPModel
-from PIL import Image
 
-def debug_device_info(tensors_dict):
-    print("---- 디바이스 정보 ----")
-    for k, v in tensors_dict.items():
-        print(f"{k}: device={v.device}, shape={v.shape}, dtype={v.dtype}")
-    print("---------------------")
+# 모델 로딩
+@st.cache_resource
+def load_model():
+    try:
+        processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+        model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32", device_map=None)
+        model.to("cpu")
+        model.eval()
+        return processor, model
+    except Exception as e:
+        st.error(f"모델 로딩 중 오류 발생: {e}")
+        return None, None
+
+def predict(image, processor, model):
+    try:
+        inputs = processor(
+            text=["a photo", "an AI-generated image"],
+            images=image,
+            return_tensors="pt",
+            padding=True
+        )
+        outputs = model(**inputs)
+        logits_per_image = outputs.logits_per_image
+        probs = logits_per_image.softmax(dim=1).squeeze().tolist()
+        return probs
+    except Exception as e:
+        st.error(f"예측 중 오류 발생: {e}")
+        return None
 
 def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    st.title("🖼️ AI 이미지 감별기 (디버깅용)")
+    st.write("이미지를 업로드하면 AI가 생성한 이미지인지 판별합니다.")
 
-    # 모델 불러오기
-    model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-    model.to(device)
-    model.eval()
+    file = st.file_uploader("이미지를 업로드 해주세요.", type=["jpg", "jpeg", "png"])
 
-    # 모델 파라미터 디바이스 출력
-    print("모델 파라미터 디바이스 예시:")
-    for name, param in model.named_parameters():
-        print(f"{name}: {param.device}")
-        break  # 한개만 확인
+    if file is None:
+        st.warning("이미지를 업로드해주세요.")
+        return
 
-    # 이미지와 텍스트 준비 (디버깅용 더미 이미지 사용)
-    processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-    image = Image.new("RGB", (224, 224), color="red")
-    inputs = processor(text=["a photo of a cat"], images=image, return_tensors="pt")
+    try:
+        image = Image.open(file).convert("RGB")
+        st.image(image, caption="업로드한 이미지", use_container_width=True)
+    except Exception as e:
+        st.error(f"이미지 처리 중 오류 발생: {e}")
+        return
 
-    # 입력 텐서 디바이스 확인
-    debug_device_info(inputs)
+    processor, model = load_model()
+    if processor is None or model is None:
+        return
 
-    # 입력 텐서를 모델 디바이스로 이동
-    inputs = {k: v.to(device) for k, v in inputs.items()}
-    debug_device_info(inputs)
+    with st.spinner("이미지 분석 중..."):
+        probs = predict(image, processor, model)
 
-    # 모델에 입력
-    with torch.no_grad():
-        outputs = model(**inputs)
+    if probs:
+        st.write(f"실사일 확률: {probs[0]*100:.2f}%")
+        st.write(f"AI 생성 이미지일 확률: {probs[1]*100:.2f}%")
 
-    print("모델 출력:", outputs)
+        if probs[1] > probs[0]:
+            st.error("⚠️ 이 이미지는 AI가 생성했을 가능성이 높습니다.")
+        else:
+            st.success("✅ 이 이미지는 실사일 가능성이 높습니다.")
 
 if __name__ == "__main__":
     main()
