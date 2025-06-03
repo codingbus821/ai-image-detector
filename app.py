@@ -7,9 +7,16 @@ from transformers import CLIPProcessor, CLIPModel
 @st.cache_resource
 def load_model():
     try:
+        from transformers import CLIPProcessor, CLIPModel
+
         processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-        # 핵심: low_cpu_mem_usage=False를 명시하여 meta tensor 상태로 로드되지 않게 함
-        model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32", low_cpu_mem_usage=False)
+
+        # 💡 meta tensor 문제 방지를 위해 low_cpu_mem_usage=False
+        model = CLIPModel.from_pretrained(
+            "openai/clip-vit-base-patch32",
+            low_cpu_mem_usage=False  # 가장 중요함!
+        )
+
         model.eval()
         return processor, model
     except Exception as e:
